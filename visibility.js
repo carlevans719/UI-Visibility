@@ -117,6 +117,7 @@ $.fn.visibility = function(parameters) {
           ;
           $context
             .off('scrollchange' + eventNamespace, module.event.scrollchange)
+						.off('horizontalscrollchange' + eventNamespace, module.event.horizontalscrollchange)
           ;
           $module
             .off(eventNamespace)
@@ -157,6 +158,7 @@ $.fn.visibility = function(parameters) {
               .off('scroll'      + eventNamespace)
               .on('scroll'       + eventNamespace, module.event.scroll)
               .on('scrollchange' + eventNamespace, module.event.scrollchange)
+							.on('horizontalscrollchange' + eventNamespace, module.event.horizontalscrollchange)
             ;
           }
         },
@@ -177,12 +179,12 @@ $.fn.visibility = function(parameters) {
             if(settings.throttle) {
               clearTimeout(module.timer);
               module.timer = setTimeout(function() {
-                $context.triggerHandler('scrollchange' + eventNamespace, [ $context.scrollTop() ]);
+								$context.triggerHandler('scrollchange' + eventNamespace, [ $context.scrollTop(), $context.scrollLeft() ]);
               }, settings.throttle);
             }
             else {
               requestAnimationFrame(function() {
-                $context.triggerHandler('scrollchange' + eventNamespace, [ $context.scrollTop() ]);
+								$context.triggerHandler('scrollchange' + eventNamespace, [ $context.scrollTop(), $context.scrollLeft() ]);
               });
             }
           },
@@ -400,19 +402,22 @@ $.fn.visibility = function(parameters) {
           }
         },
 
-        checkVisibility: function(scroll) {
+        checkVisibility: function(scrollTop, scrollLeft) {
           module.verbose('Checking visibility of element', module.cache.element);
 
           if( !disabled && module.is.visible() ) {
 
-            // save scroll position
-            module.save.scroll(scroll);
+            // save scrollTop position
+            module.save.scroll(scrollTop);
+						// save scrollLeft position
+						module.save.horizontalScroll(scrollLeft);
 
             // update calculations derived from scroll
             module.save.calculations();
 
             // percentage
             module.passed();
+						module.horizontalPassing();
 
             // reverse (must be first)
             module.passingReverse();
@@ -420,20 +425,52 @@ $.fn.visibility = function(parameters) {
             module.bottomVisibleReverse();
             module.topPassedReverse();
             module.bottomPassedReverse();
+						module.rightVisibleReverse();
+						module.leftVisibleReverse();
+						module.rightPassedReverse();
+						module.leftPassedReverse();
 
             // one time
             module.onScreen();
             module.offScreen();
             module.passing();
-            module.topVisible();
+						module.topVisible();
             module.bottomVisible();
             module.topPassed();
             module.bottomPassed();
+						module.rightVisible();
+						module.leftVisible();
+						module.rightPassed();
+						module.leftPassed();
 
             // on update callback
             if(settings.onUpdate) {
               settings.onUpdate.call(element, module.get.elementCalculations());
             }
+          }
+        },
+
+				horizontalPassed: function(amount, newCallback) {
+          var
+            calculations   = module.get.elementCalculations(),
+            amountInPixels
+          ;
+          // assign callback
+          if(amount && newCallback) {
+            settings.onHorizontalPassed[amount] = newCallback;
+          }
+          else if(amount !== undefined) {
+            return (module.get.horizontalPixelsPassed(amount) > calculations.horizontalPixelsPassed);
+          }
+          else if(calculations.horizontalPassing) {
+            $.each(settings.onHorizontalPassed, function(amount, callback) {
+              if(calculations.rightVisible || calculations.horizontalPixelsPassed > module.get.horizontalPixelsPassed(amount)) {
+                module.execute(callback, amount);
+              }
+              else if(!settings.once) {
+                module.remove.occurred(callback);
+              }
+            });
           }
         },
 
@@ -524,6 +561,28 @@ $.fn.visibility = function(parameters) {
           }
         },
 
+				horizontalPassing: function(newCallback) {
+					var
+					calculations = module.get.elementCalculations(),
+					callback     = newCallback || settings.onHorizontalPassing,
+					callbackName = 'horizontalPassing'
+					;
+					if(newCallback) {
+						debugger;
+						module.debug('Adding callback for horizontal passing', newCallback);
+						settings.onHorizontalPassing = newCallback;
+					}
+					if(calculations.horizontalPassing) {
+						module.execute(callback, callbackName);
+					}
+					else if(!settings.once) {
+						module.remove.occurred(callbackName);
+					}
+					if(newCallback !== undefined) {
+						return calculations.horizontalPassing;
+					}
+				},
+
 
         topVisible: function(newCallback) {
           var
@@ -546,6 +605,27 @@ $.fn.visibility = function(parameters) {
           }
         },
 
+				rightVisible: function(newCallback) {
+					var
+						calculations = module.get.elementCalculations(),
+						callback     = newCallback || settings.onRightVisible,
+						callbackName = 'rightVisible'
+					;
+					if(newCallback) {
+						module.debug('Adding callback for right visible', newCallback);
+						settings.onRightVisible = newCallback;
+					}
+					if(calculations.rightVisible) {
+						module.execute(callback, callbackName);
+					}
+					else if(!settings.once) {
+						module.remove.occurred(callbackName);
+					}
+					if(newCallback === undefined) {
+						return calculations.rightVisible;
+					}
+				},
+
         bottomVisible: function(newCallback) {
           var
             calculations = module.get.elementCalculations(),
@@ -566,6 +646,27 @@ $.fn.visibility = function(parameters) {
             return calculations.bottomVisible;
           }
         },
+
+				leftVisible: function(newCallback) {
+					var
+						calculations = module.get.elementCalculations(),
+						callback     = newCallback || settings.onLeftVisible,
+						callbackName = 'leftVisible'
+					;
+					if(newCallback) {
+						module.debug('Adding callback for left visible', newCallback);
+						settings.onLeftVisible = newCallback;
+					}
+					if(calculations.leftVisible) {
+						module.execute(callback, callbackName);
+					}
+					else if(!settings.once) {
+						module.remove.occurred(callbackName);
+					}
+					if(newCallback === undefined) {
+						return calculations.leftVisible;
+					}
+				},
 
         topPassed: function(newCallback) {
           var
@@ -588,6 +689,27 @@ $.fn.visibility = function(parameters) {
           }
         },
 
+				rightPassed: function(newCallback) {
+					var
+					calculations = module.get.elementCalculations(),
+					callback     = newCallback || settings.onRightPassed,
+					callbackName = 'rightPassed'
+					;
+					if(newCallback) {
+						module.debug('Adding callback for right passed', newCallback);
+						settings.onRightPassed = newCallback;
+					}
+					if(calculations.rightPassed) {
+						module.execute(callback, callbackName);
+					}
+					else if(!settings.once) {
+						module.remove.occurred(callbackName);
+					}
+					if(newCallback === undefined) {
+						return calculations.rightPassed;
+					}
+				},
+
         bottomPassed: function(newCallback) {
           var
             calculations = module.get.elementCalculations(),
@@ -608,6 +730,27 @@ $.fn.visibility = function(parameters) {
             return calculations.bottomPassed;
           }
         },
+
+				leftPassed: function(newCallback) {
+					var
+					calculations = module.get.elementCalculations(),
+					callback     = newCallback || settings.onLeftPassed,
+					callbackName = 'leftPassed'
+					;
+					if(newCallback) {
+						module.debug('Adding callback for left passed', newCallback);
+						settings.onLeftPassed = newCallback;
+					}
+					if(calculations.leftPassed) {
+						module.execute(callback, callbackName);
+					}
+					else if(!settings.once) {
+						module.remove.occurred(callbackName);
+					}
+					if(newCallback === undefined) {
+						return calculations.leftPassed;
+					}
+				},
 
         passingReverse: function(newCallback) {
           var
@@ -632,6 +775,28 @@ $.fn.visibility = function(parameters) {
           }
         },
 
+				horizontalPassingReverse: function(newCallback) {
+					var
+					calculations = module.get.elementCalculations(),
+					callback     = newCallback || settings.onHorizontalPassingReverse,
+					callbackName = 'horizontalPassingReverse'
+					;
+					if(newCallback) {
+						module.debug('Adding callback for horizontal passing reverse', newCallback);
+						settings.onHorizontalPassingReverse = newCallback;
+					}
+					if(!calculations.horizontalPassing) {
+						if(module.get.occurred('horizontalPassing')) {
+							module.execute(callback, callbackName);
+						}
+					}
+					else if(!settings.once) {
+						module.remove.occurred(callbackName);
+					}
+					if(newCallback !== undefined) {
+						return !calculations.horizontalPassing;
+					}
+				},
 
         topVisibleReverse: function(newCallback) {
           var
@@ -642,6 +807,29 @@ $.fn.visibility = function(parameters) {
           if(newCallback) {
             module.debug('Adding callback for top visible reverse', newCallback);
             settings.onTopVisibleReverse = newCallback;
+          }
+          if(!calculations.topVisible) {
+            if(module.get.occurred('topVisible')) {
+              module.execute(callback, callbackName);
+            }
+          }
+          else if(!settings.once) {
+            module.remove.occurred(callbackName);
+          }
+          if(newCallback === undefined) {
+            return !calculations.topVisible;
+          }
+        },
+
+				rightVisibleReverse: function(newCallback) {
+          var
+            calculations = module.get.elementCalculations(),
+            callback     = newCallback || settings.onRightVisibleReverse,
+            callbackName = 'rightVisibleReverse'
+          ;
+          if(newCallback) {
+            module.debug('Adding callback for right visible reverse', newCallback);
+            settings.onRightVisibleReverse = newCallback;
           }
           if(!calculations.topVisible) {
             if(module.get.occurred('topVisible')) {
@@ -679,6 +867,29 @@ $.fn.visibility = function(parameters) {
           }
         },
 
+				leftVisibleReverse: function(newCallback) {
+          var
+            calculations = module.get.elementCalculations(),
+            callback     = newCallback || settings.onLeftVisibleReverse,
+            callbackName = 'leftVisibleReverse'
+          ;
+          if(newCallback) {
+            module.debug('Adding callback for left visible reverse', newCallback);
+            settings.onLeftVisibleReverse = newCallback;
+          }
+          if(!calculations.topVisible) {
+            if(module.get.occurred('topVisible')) {
+              module.execute(callback, callbackName);
+            }
+          }
+          else if(!settings.once) {
+            module.remove.occurred(callbackName);
+          }
+          if(newCallback === undefined) {
+            return !calculations.topVisible;
+          }
+        },
+
         topPassedReverse: function(newCallback) {
           var
             calculations = module.get.elementCalculations(),
@@ -688,6 +899,29 @@ $.fn.visibility = function(parameters) {
           if(newCallback) {
             module.debug('Adding callback for top passed reverse', newCallback);
             settings.onTopPassedReverse = newCallback;
+          }
+          if(!calculations.topPassed) {
+            if(module.get.occurred('topPassed')) {
+              module.execute(callback, callbackName);
+            }
+          }
+          else if(!settings.once) {
+            module.remove.occurred(callbackName);
+          }
+          if(newCallback === undefined) {
+            return !calculations.onTopPassed;
+          }
+        },
+
+				rightPassedReverse: function(newCallback) {
+          var
+            calculations = module.get.elementCalculations(),
+            callback     = newCallback || settings.onRightPassedReverse,
+            callbackName = 'rightPassedReverse'
+          ;
+          if(newCallback) {
+            module.debug('Adding callback for right passed reverse', newCallback);
+            settings.onRightPassedReverse = newCallback;
           }
           if(!calculations.topPassed) {
             if(module.get.occurred('topPassed')) {
@@ -722,6 +956,29 @@ $.fn.visibility = function(parameters) {
           }
           if(newCallback === undefined) {
             return !calculations.bottomPassed;
+          }
+        },
+
+				leftPassedReverse: function(newCallback) {
+          var
+            calculations = module.get.elementCalculations(),
+            callback     = newCallback || settings.onLeftPassedReverse,
+            callbackName = 'leftPassedReverse'
+          ;
+          if(newCallback) {
+            module.debug('Adding callback for left passed reverse', newCallback);
+            settings.onLeftPassedReverse = newCallback;
+          }
+          if(!calculations.topPassed) {
+            if(module.get.occurred('topPassed')) {
+              module.execute(callback, callbackName);
+            }
+          }
+          else if(!settings.once) {
+            module.remove.occurred(callbackName);
+          }
+          if(newCallback === undefined) {
+            return !calculations.onTopPassed;
           }
         },
 
@@ -777,6 +1034,7 @@ $.fn.visibility = function(parameters) {
           calculations: function() {
             module.verbose('Saving all calculations necessary to determine positioning');
             module.save.direction();
+						module.save.horizontalDirection();
             module.save.screenCalculations();
             module.save.elementCalculations();
           },
@@ -792,6 +1050,10 @@ $.fn.visibility = function(parameters) {
             scrollPosition      = scrollPosition + settings.offset || $context.scrollTop() + settings.offset;
             module.cache.scroll = scrollPosition;
           },
+					horizontalScroll: function(scrollPosition) {
+						scrollPosition                = scrollPosition + settings.horizontalOffset || $context.scrollLeft() + settings.horizontalOffset;
+						module.cache.horizontalScroll = scrollPosition;
+					},
           direction: function() {
             var
               scroll     = module.get.scroll(),
@@ -810,6 +1072,24 @@ $.fn.visibility = function(parameters) {
             module.cache.direction = direction;
             return module.cache.direction;
           },
+					horizontalDirection: function () {
+						var
+							scroll     = module.get.horizontalScroll(),
+							lastScroll = module.get.lastHorizontalScroll(),
+							direction
+						;
+						if(scroll > lastScroll && lastScroll) {
+							direction = 'right';
+						}
+						else if(scroll < lastScroll && lastScroll) {
+							direction = 'left';
+						}
+						else {
+							direction = 'static';
+						}
+						module.cache.horizontalDirection = direction;
+						return module.cache.horizontalDirection;
+					},
           elementPosition: function() {
             var
               element = module.cache.element,
@@ -817,10 +1097,11 @@ $.fn.visibility = function(parameters) {
             ;
             module.verbose('Saving element position');
             // (quicker than $.extend)
-            element.fits          = (element.height < screen.height);
-            element.offset        = $module.offset();
-            element.width         = $module.outerWidth();
-            element.height        = $module.outerHeight();
+            element.fits            = (element.height < screen.height);
+						element.fitsHorizontal  = (element.width < screen.width);
+            element.offset          = $module.offset();
+            element.width           = $module.outerWidth();
+            element.height          = $module.outerHeight();
             // store
             module.cache.element = element;
             return element;
@@ -832,52 +1113,76 @@ $.fn.visibility = function(parameters) {
             ;
             // offset
             if(settings.includeMargin) {
-              element.margin        = {};
-              element.margin.top    = parseInt($module.css('margin-top'), 10);
-              element.margin.bottom = parseInt($module.css('margin-bottom'), 10);
+              element.margin          = {};
+							element.margin.top      = parseInt($module.css('margin-top'), 10);
+              element.margin.right    = parseInt($module.css('margin-right'), 10);
+							element.margin.left     = parseInt($module.css('margin-left'), 10);
+							element.margin.bottom   = parseInt($module.css('margin-bottom'), 10);
               element.top    = element.offset.top - element.margin.top;
+							element.right  = element.offset.left + element.width + element.margin.right;
               element.bottom = element.offset.top + element.height + element.margin.bottom;
+							element.left   = element.offset.left - element.margin.left;
             }
             else {
               element.top    = element.offset.top;
+							element.right  = element.offset.left + element.width;
               element.bottom = element.offset.top + element.height;
+							element.left   = element.offset.left;
             }
 
             // visibility
-            element.topVisible       = (screen.bottom >= element.top);
-            element.topPassed        = (screen.top >= element.top);
-            element.bottomVisible    = (screen.bottom >= element.bottom);
-            element.bottomPassed     = (screen.top >= element.bottom);
-            element.pixelsPassed     = 0;
-            element.percentagePassed = 0;
-
+            element.topVisible                 = (screen.bottom >= element.top);
+            element.topPassed                  = (screen.top >= element.top);
+						element.bottomVisible              = (screen.bottom >= element.bottom);
+						element.bottomPassed               = (screen.top >= element.bottom);
+						element.leftVisible                = (screen.right >= element.left);
+						element.leftPassed                 = (screen.left >= element.left);
+						element.rightVisible               = (screen.right >= element.right);
+						element.rightPassed                = (screen.left >= element.right);
+            element.pixelsPassed               = 0;
+            element.percentagePassed           = 0;
+						element.horizontalPixelsPassed     = 0;
+						element.horizontalPercentagePassed = 0;
             // meta calculations
-            element.onScreen  = (element.topVisible && !element.bottomPassed);
-            element.passing   = (element.topPassed && !element.bottomPassed);
-            element.offScreen = (!element.onScreen);
-
+            element.onScreen               = (element.topVisible && !element.bottomPassed);
+						element.onScreenHorizontally   = (element.leftVisible && !element.rightPassed);
+            element.passing                = (element.topPassed && !element.bottomPassed);
+						element.horizontalPassing      = (element.leftPassed && !element.rightPassed);
+            element.offScreen              = (!element.onScreen);
+						element.offScreenHorizontally  = (!element.onScreenHorizontally);
             // passing calculations
             if(element.passing) {
               element.pixelsPassed     = (screen.top - element.top);
               element.percentagePassed = (screen.top - element.top) / element.height;
             }
+						if (element.horizontalPassing) {
+							element.horizontalPixelsPassed      = (screen.left - element.left);
+							element.horizontalPercentagePassed  = (screen.left - element.left) / element.width;
+						}
             module.cache.element = element;
             module.verbose('Updated element calculations', element);
             return element;
           },
           screenCalculations: function() {
             var
-              scroll = module.get.scroll()
+              scroll            = module.get.scroll(),
+							horizontalScroll  = module.get.horizontalScroll()
             ;
             module.save.direction();
+						module.save.horizontalDirection();
+
             module.cache.screen.top    = scroll;
+						module.cache.screen.right  = horizontalScroll + module.cache.screen.width;
             module.cache.screen.bottom = scroll + module.cache.screen.height;
+						module.cache.screen.left   = horizontalScroll;
+
             return module.cache.screen;
           },
           screenSize: function() {
             module.verbose('Saving window position');
             module.cache.screen = {
-              height: $context.height()
+              height: $context.height(),
+							width: $context.width()
             };
           },
           position: function() {
@@ -896,6 +1201,15 @@ $.fn.visibility = function(parameters) {
             }
             return parseInt(amount, 10);
           },
+					horizontalPixelsPassed: function(amount) {
+						var
+							element = module.get.elementCalculations()
+						;
+						if(amount.search('%') > -1) {
+							return ( element.width * (parseInt(amount, 10) / 100) );
+						}
+						return parseInt(amount, 10);
+					},
           occurred: function(callback) {
             return (module.cache.occurred !== undefined)
               ? module.cache.occurred[callback] || false
@@ -908,6 +1222,12 @@ $.fn.visibility = function(parameters) {
             }
             return module.cache.direction;
           },
+					horizontalDirection: function() {
+						if(module.cache.direction === undefined) {
+							module.save.horizontalDirection();
+						}
+						return module.cache.horizontalDirection;
+					},
           elementPosition: function() {
             if(module.cache.element === undefined) {
               module.save.elementPosition();
@@ -938,13 +1258,26 @@ $.fn.visibility = function(parameters) {
             }
             return module.cache.scroll;
           },
+					horizontalScroll: function () {
+						if(module.cache.horizontalScroll === undefined) {
+							module.save.horizontalScroll();
+						}
+						return module.cache.horizontalScroll;
+					},
           lastScroll: function() {
             if(module.cache.screen === undefined) {
               module.debug('First scroll event, no last scroll could be found');
               return false;
             }
             return module.cache.screen.top;
-          }
+          },
+					lastHorizontalScroll: function () {
+						if(module.cache.screen === undefined) {
+							module.debug('First horizontal scroll event, no last scroll could be found');
+							return false;
+						}
+						return module.cache.screen.left;
+					}
         },
 
         setting: function(name, value) {
@@ -1107,6 +1440,7 @@ $.fn.visibility = function(parameters) {
           module.initialize();
         }
         instance.save.scroll();
+				instance.save.horizontalScroll();
         instance.save.calculations();
         module.invoke(query);
       }
@@ -1127,75 +1461,89 @@ $.fn.visibility = function(parameters) {
 
 $.fn.visibility.settings = {
 
-  name                   : 'Visibility',
-  namespace              : 'visibility',
+  name                       : 'Visibility',
+  namespace                  : 'visibility',
 
-  debug                  : false,
-  verbose                : false,
-  performance            : true,
+  debug                      : false,
+  verbose                    : false,
+  performance                : true,
 
   // whether to use mutation observers to follow changes
-  observeChanges         : true,
+  observeChanges             : true,
 
   // check position immediately on init
-  initialCheck           : true,
+  initialCheck               : true,
 
   // whether to refresh calculations after all page images load
-  refreshOnLoad          : true,
+  refreshOnLoad              : true,
 
   // whether to refresh calculations after page resize event
-  refreshOnResize        : true,
+  refreshOnResize            : true,
 
   // should call callbacks on refresh event (resize, etc)
-  checkOnRefresh         : true,
+  checkOnRefresh             : true,
 
   // callback should only occur one time
-  once                   : true,
+  once                       : true,
 
   // callback should fire continuously whe evaluates to true
-  continuous             : false,
+  continuous                 : false,
 
   // offset to use with scroll top
-  offset                 : 0,
+  offset                     : 0,
+
+	// offset to use with scroll left
+	horizontalOffset           : 0,
 
   // whether to include margin in elements position
-  includeMargin          : false,
+  includeMargin              : false,
 
   // scroll context for visibility checks
-  context                : window,
+  context                    : window,
 
   // visibility check delay in ms (defaults to animationFrame)
-  throttle               : false,
+  throttle                   : false,
 
   // special visibility type (image, fixed)
-  type                   : false,
+  type                       : false,
 
   // image only animation settings
-  transition             : 'fade in',
-  duration               : 1000,
+  transition                 : 'fade in',
+  duration                   : 1000,
 
   // array of callbacks for percentage
-  onPassed               : {},
+  onPassed                   : {},
+	onHorizontalPassed         : {},
 
   // standard callbacks
-  onOnScreen             : false,
-  onOffScreen            : false,
-  onPassing              : false,
-  onTopVisible           : false,
-  onBottomVisible        : false,
-  onTopPassed            : false,
-  onBottomPassed         : false,
+  onOnScreen                 : false,
+  onOffScreen                : false,
+  onPassing                  : false,
+	onHorizontalPassing        : false,
+  onTopVisible               : false,
+	onRightVisible             : false,
+  onBottomVisible            : false,
+	onLeftVisible              : false,
+  onTopPassed                : false,
+	onRightPassed              : false,
+  onBottomPassed             : false,
+	onLeftPassed               : false,
 
   // reverse callbacks
-  onPassingReverse       : false,
-  onTopVisibleReverse    : false,
-  onBottomVisibleReverse : false,
-  onTopPassedReverse     : false,
-  onBottomPassedReverse  : false,
+  onPassingReverse           : false,
+	onHorizontalPassingReverse : false,
+  onTopVisibleReverse        : false,
+	onRightVisibleReverse      : false,
+  onBottomVisibleReverse     : false,
+	onLeftVisibleReverse       : false,
+  onTopPassedReverse         : false,
+	onRightPassedReverse       : false,
+  onBottomPassedReverse      : false,
+	onLeftPassedReverse        : false,
 
   // utility callbacks
-  onUpdate               : false, // disabled by default for performance
-  onRefresh              : function(){},
+  onUpdate                   : false, // disabled by default for performance
+  onRefresh                  : function(){},
 
   metadata : {
     src: 'src'
